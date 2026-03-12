@@ -1,0 +1,69 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/helpers.php';
+
+require_method('POST');
+
+$user = require_login();
+
+if (($user['role'] ?? '') !== 'admin') {
+    respond([
+        'ok' => false,
+        'error' => 'Forbidden',
+    ], 403);
+}
+
+$input = json_input();
+$requestId = filter_var($input['request_id'] ?? null, FILTER_VALIDATE_INT);
+$status = trim((string) ($input['status'] ?? ''));
+$allowedStatuses = ['approved', 'cancelled'];
+
+if ($requestId === false || $requestId <= 0) {
+    respond([
+        'ok' => false,
+        'error' => 'A valid request_id is required',
+    ], 422);
+}
+
+if (!in_array($status, $allowedStatuses, true)) {
+    respond([
+        'ok' => false,
+        'error' => 'Invalid status',
+    ], 422);
+}
+
+try {
+    $database = db();
+    $checkStatement = $database->prepare('SELECT id FROM pickup_requests WHERE id = :id LIMIT 1');
+    $checkStatement->bindValue(':id', $requestId, SQLITE3_INTEGER);
+    $checkResult = $checkStatement->execute();
+    $existingRequest = $checkResult !== false ? $checkResult->fetchArray(SQLITE3_ASSOC) : false;
+
+    if (!is_array($existingRequest)) {
+        respond([
+            'ok' => false,
+            'error' => 'Request not found',
+        ], 404);
+    }
+
+    $statement = $database->prepare('UPDATE pickup_requests SET status = :status WHERE id = :id');
+    $statement->bindValue(':status', $status, SQLITE3_TEXT);
+    $statement->bindValue(':id', $requestId, SQLITE3_INTEGER);
+    $result = $statement->execute();
+
+    if ($result === false) {
+        throw new RuntimeException('Failed to update status');
+    }
+
+    respond([
+        'ok' => true,
+        'message' => 'Status updated',
+    ]);
+} catch (Throwable $exception) {
+    respond([
+        'ok' => false,
+        'error' => 'Failed to update status',
+    ], 500);
+}
