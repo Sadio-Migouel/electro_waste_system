@@ -1,0 +1,8 @@
+# Database files
+Data/*.sqlite
+Data/*.db
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
