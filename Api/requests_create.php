@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/notify.php';
 
 require_method('POST');
 
@@ -63,6 +64,7 @@ if ($cleanItems === []) {
 
 try {
     $database = db();
+    $database->exec('BEGIN');
     $statement = $database->prepare(
         'INSERT INTO pickup_requests (user_id, address, items, status) VALUES (:user_id, :address, :items, :status)'
     );
@@ -70,13 +72,26 @@ try {
     $statement->bindValue(':address', $address, SQLITE3_TEXT);
     $statement->bindValue(':items', json_encode($cleanItems, JSON_UNESCAPED_UNICODE), SQLITE3_TEXT);
     $statement->bindValue(':status', 'pending', SQLITE3_TEXT);
-    $statement->execute();
+    $result = $statement->execute();
+
+    if ($result === false) {
+        throw new RuntimeException('Failed to create request');
+    }
+
+    $requestId = $database->lastInsertRowID();
+    add_status_history($requestId, 'pending', 'Request created', $database);
+    $database->exec('COMMIT');
 
     respond([
         'ok' => true,
         'message' => 'Request created',
+        'request_id' => $requestId,
     ]);
 } catch (Throwable $exception) {
+    if (isset($database) && $database instanceof SQLite3) {
+        @$database->exec('ROLLBACK');
+    }
+
     respond([
         'ok' => false,
         'error' => 'Failed to create request',

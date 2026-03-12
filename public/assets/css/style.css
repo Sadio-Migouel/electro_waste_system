@@ -131,6 +131,36 @@ body {
     color: #52606d;
 }
 
+.notification-item,
+.timeline-item {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #f8fbfb;
+    border: 1px solid rgba(15, 118, 110, 0.1);
+}
+
+.notification-item.is-unread {
+    background: #effcf7;
+    border-color: rgba(15, 118, 110, 0.24);
+}
+
+.notification-title,
+.timeline-status {
+    font-weight: 600;
+    color: #102a43;
+}
+
+.notification-meta,
+.timeline-meta {
+    font-size: 0.85rem;
+    color: #52606d;
+}
+
+.timeline-list {
+    display: grid;
+    gap: 12px;
+}
+
 .meta-list {
     display: grid;
     gap: 12px;

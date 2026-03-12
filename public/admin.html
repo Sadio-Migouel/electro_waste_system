@@ -60,6 +60,45 @@
             </section>
 
             <section class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                    <div>
+                        <span class="eyebrow">Accounts</span>
+                        <h2 class="h4 mb-2 text-success-emphasis">Manage Users</h2>
+                        <p class="text-secondary mb-0">Search accounts and change roles for users, collectors, and admins.</p>
+                    </div>
+                    <button id="refreshUsersButton" type="button" class="btn btn-outline-secondary btn-sm">Refresh Users</button>
+                </div>
+
+                <div id="userManagementAlerts" class="mb-3" aria-live="polite"></div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label for="userSearchInput" class="form-label">Search users</label>
+                        <input id="userSearchInput" type="search" class="form-control" placeholder="Filter by name or email">
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Role</th>
+                                <th>Created At</th>
+                                <th>Change Role</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminUsersTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="adminUsersEmptyState" class="text-secondary small d-none">No users found.</div>
+            </section>
+
+            <section class="dashboard-card">
                 <h2>Dev Role Testing</h2>
                 <p class="text-secondary mb-3">Temporary local endpoint for switching roles while `DEV_MODE` is enabled.</p>
                 <code>POST ../Api/dev_set_role.php {"email":"user@example.com","role":"admin"}</code>

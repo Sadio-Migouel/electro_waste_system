@@ -53,6 +53,16 @@ CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 )
 SQL,
+        'request_status_history' => <<<SQL
+CREATE TABLE IF NOT EXISTS request_status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (request_id) REFERENCES pickup_requests(id) ON DELETE CASCADE
+)
+SQL,
     ];
 
     foreach ($statements as $name => $sql) {

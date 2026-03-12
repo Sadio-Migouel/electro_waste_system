@@ -4,8 +4,15 @@ const refreshAdminButton = document.getElementById("refreshAdminButton");
 const adminRequestsTableBody = document.getElementById("adminRequestsTableBody");
 const adminRequestsEmptyState = document.getElementById("adminRequestsEmptyState");
 const collectorNotice = document.getElementById("collectorNotice");
+const refreshUsersButton = document.getElementById("refreshUsersButton");
+const userManagementAlerts = document.getElementById("userManagementAlerts");
+const userSearchInput = document.getElementById("userSearchInput");
+const adminUsersTableBody = document.getElementById("adminUsersTableBody");
+const adminUsersEmptyState = document.getElementById("adminUsersEmptyState");
 
 let collectors = [];
+let allUsers = [];
+let currentAdmin = null;
 
 function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -50,6 +57,18 @@ function clearAlert() {
     adminAlerts.innerHTML = "";
 }
 
+function showUserAlert(message, type = "success") {
+    userManagementAlerts.innerHTML = `
+        <div class="alert alert-${type} mb-0" role="alert">
+            ${escapeHtml(message)}
+        </div>
+    `;
+}
+
+function clearUserAlert() {
+    userManagementAlerts.innerHTML = "";
+}
+
 function statusBadge(status) {
     const variants = {
         pending: "secondary",
@@ -60,6 +79,18 @@ function statusBadge(status) {
     };
     const variant = variants[status] || "dark";
     const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown";
+
+    return `<span class="badge text-bg-${variant}">${escapeHtml(label)}</span>`;
+}
+
+function roleBadge(role) {
+    const variants = {
+        user: "secondary",
+        collector: "warning",
+        admin: "primary"
+    };
+    const variant = variants[role] || "dark";
+    const label = role ? role.charAt(0).toUpperCase() + role.slice(1) : "Unknown";
 
     return `<span class="badge text-bg-${variant}">${escapeHtml(label)}</span>`;
 }
@@ -148,6 +179,73 @@ function renderRequests(requests) {
     bindTableActions();
 }
 
+function filteredUsers() {
+    const term = (userSearchInput.value || "").trim().toLowerCase();
+
+    if (term === "") {
+        return allUsers;
+    }
+
+    return allUsers.filter((user) => {
+        const haystack = `${user.full_name} ${user.email}`.toLowerCase();
+        return haystack.includes(term);
+    });
+}
+
+function renderUsers(users) {
+    if (!Array.isArray(users) || users.length === 0) {
+        adminUsersTableBody.innerHTML = "";
+        adminUsersEmptyState.classList.remove("d-none");
+        return;
+    }
+
+    adminUsersEmptyState.classList.add("d-none");
+    adminUsersTableBody.innerHTML = users.map((user) => {
+        const isSelf = currentAdmin && Number(user.id) === Number(currentAdmin.id);
+
+        return `
+            <tr>
+                <td>${user.id}</td>
+                <td>${escapeHtml(user.full_name)}</td>
+                <td>${escapeHtml(user.email)}</td>
+                <td>${escapeHtml(user.phone || "-")}</td>
+                <td>${roleBadge(user.role)}</td>
+                <td>${escapeHtml(user.created_at)}</td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <select class="form-select role-select" data-user-id="${user.id}">
+                            <option value="user" ${user.role === "user" ? "selected" : ""}>user</option>
+                            <option value="collector" ${user.role === "collector" ? "selected" : ""}>collector</option>
+                            <option value="admin" ${user.role === "admin" ? "selected" : ""}>admin</option>
+                        </select>
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary update-role-button"
+                            data-user-id="${user.id}"
+                            ${isSelf ? 'title="You cannot remove your own admin role."' : ""}
+                        >
+                            Update
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    bindUserActions();
+}
+
+function bindUserActions() {
+    document.querySelectorAll(".update-role-button").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+            const userId = Number.parseInt(event.currentTarget.dataset.userId, 10);
+            const select = document.querySelector(`.role-select[data-user-id="${userId}"]`);
+            const role = select ? select.value : "";
+            await updateUserRole(userId, role, event.currentTarget, select);
+        });
+    });
+}
+
 function bindTableActions() {
     document.querySelectorAll(".collector-select").forEach((select) => {
         select.addEventListener("change", (event) => {
@@ -191,21 +289,41 @@ async function loadRequests() {
     renderRequests(result.requests || []);
 }
 
+async function loadUsers() {
+    const result = await api("admin_users_list.php");
+    allUsers = Array.isArray(result.users) ? result.users : [];
+    renderUsers(filteredUsers());
+}
+
 async function refreshAdminData() {
     clearAlert();
+    clearUserAlert();
     refreshAdminButton.disabled = true;
     refreshAdminButton.textContent = "Refreshing...";
+    refreshUsersButton.disabled = true;
+    refreshUsersButton.textContent = "Refreshing...";
 
     try {
         await loadCollectors();
         await loadRequests();
+        await loadUsers();
     } catch (error) {
-        adminRequestsTableBody.innerHTML = "";
-        adminRequestsEmptyState.classList.remove("d-none");
+        if (!adminRequestsTableBody.innerHTML) {
+            adminRequestsTableBody.innerHTML = "";
+            adminRequestsEmptyState.classList.remove("d-none");
+        }
+
+        if (!adminUsersTableBody.innerHTML) {
+            adminUsersTableBody.innerHTML = "";
+            adminUsersEmptyState.classList.remove("d-none");
+        }
+
         showAlert(error.message || "Failed to load admin data", "danger");
     } finally {
         refreshAdminButton.disabled = false;
         refreshAdminButton.textContent = "Refresh";
+        refreshUsersButton.disabled = false;
+        refreshUsersButton.textContent = "Refresh Users";
     }
 }
 
@@ -254,6 +372,35 @@ async function assignCollector(requestId, collectorId, button, select) {
     }
 }
 
+async function updateUserRole(userId, role, button, select) {
+    if (!Number.isInteger(userId) || userId <= 0) {
+        showUserAlert("Invalid user selected.", "danger");
+        return;
+    }
+
+    clearUserAlert();
+    button.disabled = true;
+    select.disabled = true;
+    button.textContent = "Updating...";
+
+    try {
+        await api("admin_set_role.php", "POST", {
+            user_id: userId,
+            role
+        });
+        showUserAlert("Role updated.");
+        await loadCollectors();
+        await loadUsers();
+        await loadRequests();
+    } catch (error) {
+        showUserAlert(error.message || "Failed to update role", "danger");
+    } finally {
+        button.disabled = false;
+        select.disabled = false;
+        button.textContent = "Update";
+    }
+}
+
 async function loadPage() {
     await renderNavbar();
     const user = await requireRole("admin");
@@ -262,11 +409,31 @@ async function loadPage() {
         return;
     }
 
+    currentAdmin = user;
     renderAdmin(user);
     await refreshAdminData();
 }
 
 refreshAdminButton.addEventListener("click", refreshAdminData);
+refreshUsersButton.addEventListener("click", async () => {
+    clearUserAlert();
+    refreshUsersButton.disabled = true;
+    refreshUsersButton.textContent = "Refreshing...";
+
+    try {
+        await loadUsers();
+    } catch (error) {
+        adminUsersTableBody.innerHTML = "";
+        adminUsersEmptyState.classList.remove("d-none");
+        showUserAlert(error.message || "Failed to load users", "danger");
+    } finally {
+        refreshUsersButton.disabled = false;
+        refreshUsersButton.textContent = "Refresh Users";
+    }
+});
+userSearchInput.addEventListener("input", () => {
+    renderUsers(filteredUsers());
+});
 
 loadPage().catch((error) => {
     showAlert(error.message || "Failed to load admin page", "danger");

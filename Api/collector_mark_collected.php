@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/notify.php';
 
 require_method('POST');
 
@@ -46,6 +47,22 @@ try {
         ], 403);
     }
 
+    $ownerStatement = $database->prepare(
+        'SELECT user_id FROM pickup_requests WHERE id = :rid LIMIT 1'
+    );
+    $ownerStatement->bindValue(':rid', $requestId, SQLITE3_INTEGER);
+    $ownerResult = $ownerStatement->execute();
+    $ownerRow = $ownerResult !== false ? $ownerResult->fetchArray(SQLITE3_ASSOC) : false;
+
+    if (!is_array($ownerRow)) {
+        respond([
+            'ok' => false,
+            'error' => 'Request not found',
+        ], 404);
+    }
+
+    $database->exec('BEGIN');
+
     $updateStatement = $database->prepare(
         "UPDATE pickup_requests
          SET status = 'collected'
@@ -59,17 +76,31 @@ try {
     }
 
     if ($database->changes() < 1) {
+        $database->exec('ROLLBACK');
         respond([
             'ok' => false,
             'error' => 'Only assigned requests can be marked as collected',
         ], 409);
     }
 
+    add_status_history($requestId, 'collected', 'Marked collected by collector', $database);
+    add_notification(
+        (int) $ownerRow['user_id'],
+        'Pickup Collected',
+        "Your pickup request #{$requestId} has been marked as collected.",
+        $database
+    );
+    $database->exec('COMMIT');
+
     respond([
         'ok' => true,
         'message' => 'Marked as collected',
     ]);
 } catch (Throwable $exception) {
+    if (isset($database) && $database instanceof SQLite3) {
+        @$database->exec('ROLLBACK');
+    }
+
     respond([
         'ok' => false,
         'error' => 'Failed to mark request as collected',

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/notify.php';
 
 require_method('POST');
 
@@ -36,7 +37,7 @@ if (!in_array($status, $allowedStatuses, true)) {
 
 try {
     $database = db();
-    $checkStatement = $database->prepare('SELECT id FROM pickup_requests WHERE id = :id LIMIT 1');
+    $checkStatement = $database->prepare('SELECT id, user_id FROM pickup_requests WHERE id = :id LIMIT 1');
     $checkStatement->bindValue(':id', $requestId, SQLITE3_INTEGER);
     $checkResult = $checkStatement->execute();
     $existingRequest = $checkResult !== false ? $checkResult->fetchArray(SQLITE3_ASSOC) : false;
@@ -48,6 +49,8 @@ try {
         ], 404);
     }
 
+    $database->exec('BEGIN');
+
     $statement = $database->prepare('UPDATE pickup_requests SET status = :status WHERE id = :id');
     $statement->bindValue(':status', $status, SQLITE3_TEXT);
     $statement->bindValue(':id', $requestId, SQLITE3_INTEGER);
@@ -57,11 +60,25 @@ try {
         throw new RuntimeException('Failed to update status');
     }
 
+    $note = $status === 'approved' ? 'Approved by admin' : 'Cancelled by admin';
+    $title = $status === 'approved' ? 'Request Approved' : 'Request Cancelled';
+    $message = $status === 'approved'
+        ? "Your pickup request #{$requestId} was approved."
+        : "Your pickup request #{$requestId} was cancelled.";
+
+    add_status_history($requestId, $status, $note, $database);
+    add_notification((int) $existingRequest['user_id'], $title, $message, $database);
+    $database->exec('COMMIT');
+
     respond([
         'ok' => true,
         'message' => 'Status updated',
     ]);
 } catch (Throwable $exception) {
+    if (isset($database) && $database instanceof SQLite3) {
+        @$database->exec('ROLLBACK');
+    }
+
     respond([
         'ok' => false,
         'error' => 'Failed to update status',

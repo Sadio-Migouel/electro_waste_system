@@ -27,6 +27,10 @@ async function renderNavbar() {
             <div class="container-fluid px-0">
                 <a class="navbar-brand fw-semibold" href="./dashboard.html">E-Waste</a>
                 <div class="d-flex align-items-center gap-3 ms-auto">
+                    <div id="navbarNotificationBell" class="position-relative d-none" aria-label="Notifications">
+                        <span class="small text-secondary" aria-hidden="true">Alerts</span>
+                        <span id="navbarNotificationCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger d-none">0</span>
+                    </div>
                     <div class="text-end">
                         <div class="navbar-user-name">${user.full_name}</div>
                         <div class="navbar-user-role">${user.role}</div>
@@ -48,6 +52,29 @@ async function renderNavbar() {
         }
     });
 
+    loadNavbarNotifications().catch(() => {
+        const bell = document.getElementById("navbarNotificationBell");
+
+        if (bell) {
+            bell.classList.add("d-none");
+        }
+    });
+
     return user;
 }
 
+async function loadNavbarNotifications() {
+    const bell = document.getElementById("navbarNotificationBell");
+    const countBadge = document.getElementById("navbarNotificationCount");
+
+    if (!bell || !countBadge) {
+        return;
+    }
+
+    const result = await api("notifications_list.php");
+    const unreadCount = (result.notifications || []).filter((item) => Number(item.is_read) === 0).length;
+
+    bell.classList.remove("d-none");
+    countBadge.textContent = String(unreadCount);
+    countBadge.classList.toggle("d-none", unreadCount === 0);
+}

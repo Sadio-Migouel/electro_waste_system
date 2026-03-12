@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/notify.php';
 
 require_method('POST');
 
@@ -29,7 +30,7 @@ if ($requestId === false || $requestId <= 0 || $collectorId === false || $collec
 try {
     $database = db();
 
-    $requestCheck = $database->prepare('SELECT id FROM pickup_requests WHERE id = :id LIMIT 1');
+    $requestCheck = $database->prepare('SELECT id, user_id FROM pickup_requests WHERE id = :id LIMIT 1');
     $requestCheck->bindValue(':id', $requestId, SQLITE3_INTEGER);
     $requestResult = $requestCheck->execute();
     $requestRow = $requestResult !== false ? $requestResult->fetchArray(SQLITE3_ASSOC) : false;
@@ -42,7 +43,7 @@ try {
     }
 
     $collectorCheck = $database->prepare(
-        "SELECT id FROM users WHERE id = :id AND role = 'collector' LIMIT 1"
+        "SELECT id, full_name FROM users WHERE id = :id AND role = 'collector' LIMIT 1"
     );
     $collectorCheck->bindValue(':id', $collectorId, SQLITE3_INTEGER);
     $collectorResult = $collectorCheck->execute();
@@ -95,6 +96,20 @@ try {
     if ($requestUpdateResult === false) {
         throw new RuntimeException('Failed to update request status');
     }
+
+    add_status_history($requestId, 'assigned', 'Assigned to collector', $database);
+    add_notification(
+        (int) $requestRow['user_id'],
+        'Collector Assigned',
+        "A collector has been assigned to your pickup request #{$requestId}.",
+        $database
+    );
+    add_notification(
+        (int) $collectorId,
+        'New Pickup Assigned',
+        "You have been assigned pickup request #{$requestId}.",
+        $database
+    );
 
     $database->exec('COMMIT');
 
