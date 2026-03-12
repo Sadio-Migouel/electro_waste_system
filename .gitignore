@@ -6,3 +6,7 @@ Data/*.db
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Ignore local database files
+Data/*.sqlite
+Data/*.db
