@@ -1,0 +1,12 @@
+# Database files
+Data/*.sqlite
+Data/*.db
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Ignore local database files
+Data/*.sqlite
+Data/*.db
