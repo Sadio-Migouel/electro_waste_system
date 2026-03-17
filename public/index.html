@@ -3,45 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Waste Management</title>
+    <title>Home | E-Waste System</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./assets/css/landing.css">
 </head>
-<body>
-    <main class="container py-5">
-        <section class="hero-card">
-            <span class="eyebrow">E-Waste Management Web App</span>
-            <h1>Day 2 foundation with session-based authentication</h1>
-            <p class="lead-copy">The project now includes registration, login, session persistence, and a protected dashboard backed by the PHP JSON API.</p>
-            <nav class="link-grid">
-                <a class="link-card" href="./register.html">
-                    <strong>Register</strong>
-                    <span>Create a new account</span>
-                </a>
-                <a class="link-card" href="./login.html">
-                    <strong>Login</strong>
-                    <span>Start a session</span>
-                </a>
-                <a class="link-card" href="./dashboard.html">
-                    <strong>Dashboard</strong>
-                    <span>View the protected page</span>
-                </a>
-                <a class="link-card" href="../Api/health.php">
-                    <strong>Health Check</strong>
-                    <span>Verify API + DB</span>
-                </a>
-                <a class="link-card" href="../Api/check_db.php">
-                    <strong>Check DB</strong>
-                    <span>List current tables</span>
-                </a>
-                <a class="link-card" href="../Api/init_db.php">
-                    <strong>Init DB</strong>
-                    <span>Create or update schema</span>
-                </a>
-            </nav>
+<body id="top">
+    <nav class="navbar navbar-expand-lg sticky-top landing-navbar">
+        <div class="container">
+            <a class="navbar-brand brand-lockup" href="./index.html">
+                <span class="brand-logo"><img src="assets/img/logo.jpg" alt="E-Waste System logo"></span>
+                <span>
+                    <span class="brand-title">E-Waste System</span>
+                    <span class="brand-subtitle">Smarter electronic waste recovery</span>
+                </span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav mx-auto mb-3 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link active" aria-current="page" href="./index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="./about.html">About</a></li>
+                    <li class="nav-item"><a class="nav-link" href="./contact.html">Contact</a></li>
+                </ul>
+                <div class="nav-actions">
+                    <a class="btn btn-outline-success" href="./login.html">Login</a>
+                    <a class="btn btn-success" href="./register.html">Register</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero-section">
+            <div class="container">
+                <div class="row align-items-center g-4">
+                    <div class="col-lg-6">
+                        <span class="section-kicker hero-kicker">Responsible disposal, modern workflow</span>
+                        <h1 class="hero-title">Keep e-waste out of dumps with a pickup system built for speed, trust, and visibility.</h1>
+                        <p class="hero-subtitle">E-Waste System helps residents submit pickup requests, enables admins to approve and assign jobs, and gives collectors a clear path from request to verified collection.</p>
+                        <div class="hero-actions">
+                            <a class="btn btn-success btn-lg" href="./register.html">Request Pickup</a>
+                            <a class="btn btn-outline-success btn-lg" href="./login.html">Login</a>
+                        </div>
+                        <div class="hero-metrics">
+                            <div class="metric-card"><strong>24/7</strong><span>Request intake from any device</span></div>
+                            <div class="metric-card"><strong>End-to-end</strong><span>From approval to collector update</span></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="hero-media">
+                            <div id="heroCarousel" class="carousel slide hero-carousel shadow-soft" data-bs-ride="carousel">
+                                <div class="carousel-indicators">
+                                    <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+                                    <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+                                    <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+                                </div>
+                                <div class="carousel-inner">
+                                    <div class="carousel-item active">
+                                        <img src="assets/img/hero-ewaste.jpg" class="d-block w-100" alt="Electronic waste collection overview">
+                                        <div class="carousel-caption">
+                                            <h5>Organize community pickup requests</h5>
+                                            <p>Launch an easy entry point for safe disposal and route every request to the right team.</p>
+                                        </div>
+                                    </div>
+                                    <div class="carousel-item">
+                                        <img src="assets/img/ewaste-bin.jpg" class="d-block w-100" alt="Collection equipment and e-waste bins">
+                                        <div class="carousel-caption">
+                                            <h5>Equip collectors with clear work orders</h5>
+                                            <p>Assignments stay visible so nothing slips through the cracks.</p>
+                                        </div>
+                                    </div>
+                                    <div class="carousel-item">
+                                        <img src="assets/img/eco-tech.jpg" class="d-block w-100" alt="Eco-technology visualization">
+                                        <div class="carousel-caption">
+                                            <h5>Pair sustainability with technology</h5>
+                                            <p>Use tracking and reporting to turn pickup operations into measurable impact.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="visually-hidden">Previous</span></button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Next</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-heading text-center">
+                    <span class="section-kicker">Core platform features</span>
+                    <h2>Designed for a dependable pickup workflow</h2>
+                    <p class="section-copy narrow-copy">Every stage of the system is built to reduce manual confusion and keep residents, admins, and collectors aligned.</p>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-6 col-xl-3"><article class="feature-card reveal-card"><span class="feature-icon"><i class="bi bi-lightning-charge"></i></span><h3>Fast Pickup Requests</h3><p>Residents can register quickly and submit disposal needs without complex forms or offline follow-up.</p></article></div>
+                    <div class="col-md-6 col-xl-3"><article class="feature-card reveal-card"><span class="feature-icon"><i class="bi bi-patch-check"></i></span><h3>Admin Approval &amp; Assignment</h3><p>Administrators review requests, validate details, and assign the right collector in a controlled flow.</p></article></div>
+                    <div class="col-md-6 col-xl-3"><article class="feature-card reveal-card"><span class="feature-icon"><i class="bi bi-truck"></i></span><h3>Collector Work Orders</h3><p>Collectors receive actionable tasks so pickup routes and statuses stay consistent in the field.</p></article></div>
+                    <div class="col-md-6 col-xl-3"><article class="feature-card reveal-card"><span class="feature-icon"><i class="bi bi-graph-up-arrow"></i></span><h3>Tracking + Reports</h3><p>Monitor request progress and use reporting views to measure environmental service delivery.</p></article></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section section-soft">
+            <div class="container">
+                <div class="row align-items-center g-5">
+                    <div class="col-lg-6">
+                        <span class="section-kicker">How it works</span>
+                        <h2>One clear path from request to collection</h2>
+                        <div class="timeline-stack">
+                            <div class="timeline-item"><span class="timeline-step">1</span><div><h3>Submit request</h3><p>Users create a pickup request with the basic details needed for planning.</p></div></div>
+                            <div class="timeline-item"><span class="timeline-step">2</span><div><h3>Admin approves</h3><p>The admin checks the request and confirms that it is ready to proceed.</p></div></div>
+                            <div class="timeline-item"><span class="timeline-step">3</span><div><h3>Admin assigns collector</h3><p>The right collector receives the work order with visibility into status and timing.</p></div></div>
+                            <div class="timeline-item"><span class="timeline-step">4</span><div><h3>Collector picks up &amp; marks collected</h3><p>Field updates complete the loop and keep the request history accurate.</p></div></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6"><div class="media-shell shadow-soft"><img src="assets/img/recycling-process.jpg" alt="Recycling process illustration" class="section-image"></div></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="row align-items-end justify-content-between g-4 mb-4">
+                    <div class="col-lg-7">
+                        <span class="section-kicker">The bigger problem</span>
+                        <h2>E-waste piles up quickly when systems are fragmented</h2>
+                        <p class="section-copy">Improper disposal can release harmful materials into soil and water, while reusable components are lost when electronics are dumped without sorting. A reliable digital workflow helps communities collect faster and dispose more responsibly.</p>
+                    </div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-4"><div class="gallery-card"><img src="assets/img/ewaste-yard-1.jpg" alt="E-waste yard view" class="section-image"></div></div>
+                    <div class="col-md-4"><div class="gallery-card"><img src="assets/img/ewaste-yard-2.jpg" alt="Recycling queue snapshot" class="section-image"></div></div>
+                    <div class="col-md-4"><div class="gallery-card"><img src="assets/img/ewaste-yard-3.jpg" alt="Recovery site" class="section-image"></div></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="cta-banner shadow-soft">
+                    <div>
+                        <span class="section-kicker text-white-50">Get started</span>
+                        <h2>Ready to dispose responsibly?</h2>
+                        <p>Create an account to request pickup or sign in to manage your activity.</p>
+                    </div>
+                    <div class="hero-actions">
+                        <a class="btn btn-light btn-lg" href="./register.html">Register</a>
+                        <a class="btn btn-outline-light btn-lg" href="./login.html">Login</a>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
-    <script src="./assets/js/app.js"></script>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4"><h3>E-Waste System</h3><p>A practical digital platform for cleaner neighborhoods, smoother collection workflows, and measurable e-waste impact.</p></div>
+                <div class="col-6 col-lg-2"><h4>Quick Links</h4><ul class="footer-links"><li><a href="./index.html">Home</a></li><li><a href="./about.html">About</a></li><li><a href="./contact.html">Contact</a></li></ul></div>
+                <div class="col-6 col-lg-3"><h4>Access</h4><ul class="footer-links"><li><a href="./login.html">Login</a></li><li><a href="./register.html">Register</a></li><li><a href="./request.html">Pickup Request</a></li></ul></div>
+                <div class="col-lg-3"><h4>Contact</h4><ul class="footer-links"><li><a href="./contact.html">Support Desk</a></li><li><span>Yaounde, Cameroon</span></li><li><span>Mon - Sat, 8:00 - 18:00</span></li></ul></div>
+            </div>
+            <div class="footer-bottom"><span>&copy; 2026 E-Waste System. All rights reserved.</span></div>
+        </div>
+    </footer>
+
+    <a class="back-to-top" href="#top" aria-label="Back to top"><i class="bi bi-arrow-up"></i></a>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
