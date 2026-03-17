@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Requests | E-Waste System</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./assets/css/app.css">
+</head>
+<body>
+    <div id="app"></div>
+
+    <script src="./assets/js/api.js"></script>
+    <script src="./assets/js/layout.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let timelineModal = null;
+
+        function renderNotifications(notifications) {
+            const recentNotifications = Array.isArray(notifications) ? notifications.slice(0, 5) : [];
+            const unreadCount = Array.isArray(notifications)
+                ? notifications.filter((notification) => Number(notification.is_read) === 0).length
+                : 0;
+
+            document.getElementById("notificationsBadge").textContent = `${unreadCount} unread`;
+            document.getElementById("notificationsBadge").classList.toggle("d-none", unreadCount === 0);
+            document.getElementById("markAllReadButton").disabled = unreadCount === 0;
+
+            if (recentNotifications.length === 0) {
+                document.getElementById("notificationsList").innerHTML = "";
+                document.getElementById("notificationsEmptyState").classList.remove("d-none");
+                return;
+            }
+
+            document.getElementById("notificationsEmptyState").classList.add("d-none");
+            document.getElementById("notificationsList").innerHTML = recentNotifications.map((notification) => `
+                <article class="notification-item ${Number(notification.is_read) === 0 ? "is-unread" : ""}">
+                    <div class="d-flex justify-content-between gap-3">
+                        <div>
+                            <div class="notification-title">
+                                ${escapeHtml(notification.title)}
+                                ${Number(notification.is_read) === 0 ? '<span class="badge text-bg-success ms-2">New</span>' : ""}
+                            </div>
+                            <div>${escapeHtml(notification.message)}</div>
+                        </div>
+                        <div class="notification-meta text-nowrap">${escapeHtml(notification.created_at)}</div>
+                    </div>
+                </article>
+            `).join("");
+        }
+
+        function requestsTable(requests) {
+            if (!Array.isArray(requests) || requests.length === 0) {
+                return `
+                    <section class="surface-card empty-state">
+                        <i class="bi bi-search fs-2 d-block mb-3"></i>
+                        <div class="fw-semibold mb-2">No requests to show</div>
+                        <div>Your submitted or assigned pickup requests will appear here.</div>
+                    </section>
+                `;
+            }
+
+            return `
+                <section class="surface-card table-shell">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Status</th>
+                                    <th>Address</th>
+                                    <th>Items</th>
+                                    <th>Created At</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${requests.map((request) => `
+                                    <tr>
+                                        <td>#${request.id}</td>
+                                        <td>${statusBadge(request.status)}</td>
+                                        <td>${escapeHtml(request.address)}</td>
+                                        <td>${escapeHtml(itemsSummary(request.items))}</td>
+                                        <td>${escapeHtml(request.created_at)}</td>
+                                        <td>
+                                            <button type="button" class="btn btn-outline-primary btn-sm js-timeline" data-request-id="${request.id}">
+                                                View Timeline
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            `;
+        }
+
+        function renderTimeline(history, requestId) {
+            const timelineList = document.getElementById("timelineList");
+            const timelineEmptyState = document.getElementById("timelineEmptyState");
+            const timelineFeedback = document.getElementById("timelineFeedback");
+            const modalLabel = document.getElementById("timelineModalLabel");
+
+            timelineFeedback.innerHTML = "";
+            modalLabel.textContent = `Request #${requestId} Timeline`;
+            timelineEmptyState.classList.toggle("d-none", Array.isArray(history) && history.length > 0);
+
+            if (!Array.isArray(history) || history.length === 0) {
+                timelineList.innerHTML = "";
+                return;
+            }
+
+            timelineList.innerHTML = history.map((entry) => `
+                <article class="timeline-item">
+                    <div class="d-flex justify-content-between gap-3">
+                        <div>
+                            <div class="timeline-status">${statusBadge(entry.status)}</div>
+                            <div class="mt-2">${escapeHtml(entry.note || `Status changed to ${entry.status}`)}</div>
+                        </div>
+                        <div class="timeline-meta text-nowrap">${escapeHtml(entry.created_at)}</div>
+                    </div>
+                </article>
+            `).join("");
+        }
+
+        async function loadTrackPage() {
+            const user = await initLayout("track", "Track Requests");
+
+            if (!user) {
+                return;
+            }
+
+            const pageOutlet = document.getElementById("pageOutlet");
+            pageOutlet.innerHTML = `
+                <section class="surface-card page-heading">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+                        <div>
+                            <div class="page-chip"><i class="bi bi-list-check"></i> Request tracking</div>
+                            <h2 class="mt-3">Monitor current pickup activity</h2>
+                            <p>Refresh this page to see the latest status, notifications, and request timeline updates.</p>
+                        </div>
+                        <div class="align-self-start align-self-lg-center d-flex gap-2">
+                            <button type="button" id="refreshButton" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise me-2"></i>
+                                Refresh Requests
+                            </button>
+                            <button type="button" id="refreshNotificationsButton" class="btn btn-outline-success">
+                                <i class="bi bi-bell me-2"></i>
+                                Refresh Alerts
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <div id="trackAlert"></div>
+                <div class="row g-4">
+                    <div class="col-12 col-xl-8">
+                        <div id="trackTable"></div>
+                    </div>
+                    <div class="col-12 col-xl-4">
+                        <section class="surface-card h-100">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                <div>
+                                    <h3 class="h5 mb-1">Notifications <span id="notificationsBadge" class="badge text-bg-danger d-none">0 unread</span></h3>
+                                    <p class="text-secondary mb-0">Recent updates about your pickup requests.</p>
+                                </div>
+                                <button type="button" id="markAllReadButton" class="btn btn-outline-success btn-sm">Mark all read</button>
+                            </div>
+                            <div id="notificationsList" class="d-grid gap-3"></div>
+                            <div id="notificationsEmptyState" class="text-secondary small d-none">No notifications yet.</div>
+                        </section>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="timelineModal" tabindex="-1" aria-labelledby="timelineModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2 class="modal-title fs-5" id="timelineModalLabel">Request Timeline</h2>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="timelineFeedback" class="mb-3"></div>
+                                <div id="timelineList" class="timeline-list"></div>
+                                <div id="timelineEmptyState" class="text-secondary small d-none">No timeline entries found.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            timelineModal = new bootstrap.Modal(document.getElementById("timelineModal"));
+
+            const refreshButton = document.getElementById("refreshButton");
+            const refreshNotificationsButton = document.getElementById("refreshNotificationsButton");
+            const markAllReadButton = document.getElementById("markAllReadButton");
+            const alertHost = document.getElementById("trackAlert");
+            const tableHost = document.getElementById("trackTable");
+
+            async function renderRequestsList() {
+                refreshButton.disabled = true;
+                refreshButton.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i>Refreshing...';
+                alertHost.innerHTML = "";
+
+                try {
+                    const result = await api("requests_list.php");
+                    tableHost.innerHTML = requestsTable(result.requests || []);
+                } catch (error) {
+                    alertHost.innerHTML = `
+                        <div class="alert alert-danger mb-4" role="alert">
+                            ${escapeHtml(error.message || "Failed to load requests")}
+                        </div>
+                    `;
+                    tableHost.innerHTML = requestsTable([]);
+                } finally {
+                    refreshButton.disabled = false;
+                    refreshButton.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Refresh Requests';
+                }
+            }
+
+            async function renderNotificationsList() {
+                refreshNotificationsButton.disabled = true;
+                refreshNotificationsButton.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i>Refreshing...';
+
+                try {
+                    const result = await api("notifications_list.php");
+                    renderNotifications(result.notifications || []);
+                } catch (error) {
+                    alertHost.innerHTML = `
+                        <div class="alert alert-danger mb-4" role="alert">
+                            ${escapeHtml(error.message || "Failed to load notifications")}
+                        </div>
+                    `;
+                    document.getElementById("notificationsList").innerHTML = "";
+                    document.getElementById("notificationsEmptyState").classList.remove("d-none");
+                } finally {
+                    refreshNotificationsButton.disabled = false;
+                    refreshNotificationsButton.innerHTML = '<i class="bi bi-bell me-2"></i>Refresh Alerts';
+                }
+            }
+
+            async function markAllRead() {
+                markAllReadButton.disabled = true;
+                markAllReadButton.textContent = 'Marking...';
+
+                try {
+                    await api("notifications_mark_read.php", "POST", { mark_all: true });
+                    await renderNotificationsList();
+                } catch (error) {
+                    alertHost.innerHTML = `
+                        <div class="alert alert-danger mb-4" role="alert">
+                            ${escapeHtml(error.message || "Failed to mark notifications as read")}
+                        </div>
+                    `;
+                } finally {
+                    markAllReadButton.textContent = 'Mark all read';
+                }
+            }
+
+            async function openTimeline(requestId) {
+                document.getElementById("timelineFeedback").innerHTML = "";
+                document.getElementById("timelineList").innerHTML = '<div class="text-secondary small">Loading timeline...</div>';
+                document.getElementById("timelineEmptyState").classList.add("d-none");
+                timelineModal.show();
+
+                try {
+                    const result = await api("request_timeline.php", "POST", { request_id: requestId });
+                    renderTimeline(result.history || [], requestId);
+                } catch (error) {
+                    document.getElementById("timelineList").innerHTML = "";
+                    document.getElementById("timelineFeedback").innerHTML = `
+                        <div class="alert alert-danger mb-0" role="alert">
+                            ${escapeHtml(error.message || "Failed to load timeline")}
+                        </div>
+                    `;
+                }
+            }
+
+            tableHost.addEventListener("click", (event) => {
+                const button = event.target.closest(".js-timeline");
+
+                if (!button) {
+                    return;
+                }
+
+                const requestId = Number.parseInt(button.dataset.requestId || "", 10);
+
+                if (!Number.isInteger(requestId) || requestId <= 0) {
+                    return;
+                }
+
+                openTimeline(requestId);
+            });
+
+            refreshButton.addEventListener("click", renderRequestsList);
+            refreshNotificationsButton.addEventListener("click", renderNotificationsList);
+            markAllReadButton.addEventListener("click", markAllRead);
+
+            await renderRequestsList();
+            await renderNotificationsList();
+        }
+
+        loadTrackPage().catch((err) => {
+            console.error(err);
+            const outlet = document.getElementById("pageOutlet") || document.getElementById("app");
+            if (outlet) {
+                outlet.innerHTML = `<div class="alert alert-danger" role="alert">${escapeHtml(err.message || "Failed to load track page")}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
+

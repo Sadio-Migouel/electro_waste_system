@@ -10,12 +10,17 @@ function add_notification(int $userId, string $title, string $message, ?SQLite3 
     $statement = $connection->prepare(
         'INSERT INTO notifications (user_id, title, message) VALUES (:user_id, :title, :message)'
     );
+
+    if ($statement === false) {
+        throw new RuntimeException('Prepare failed: ' . $connection->lastErrorMsg());
+    }
+
     $statement->bindValue(':user_id', $userId, SQLITE3_INTEGER);
     $statement->bindValue(':title', $title, SQLITE3_TEXT);
     $statement->bindValue(':message', $message, SQLITE3_TEXT);
 
     if ($statement->execute() === false) {
-        throw new RuntimeException('Failed to add notification');
+        throw new RuntimeException('Execute failed: ' . $connection->lastErrorMsg());
     }
 }
 
@@ -25,11 +30,16 @@ function add_status_history(int $requestId, string $status, ?string $note = null
     $statement = $connection->prepare(
         'INSERT INTO request_status_history (request_id, status, note) VALUES (:request_id, :status, :note)'
     );
+
+    if ($statement === false) {
+        throw new RuntimeException('Prepare failed: ' . $connection->lastErrorMsg());
+    }
+
     $statement->bindValue(':request_id', $requestId, SQLITE3_INTEGER);
     $statement->bindValue(':status', $status, SQLITE3_TEXT);
     $statement->bindValue(':note', $note, $note === null ? SQLITE3_NULL : SQLITE3_TEXT);
 
     if ($statement->execute() === false) {
-        throw new RuntimeException('Failed to add status history');
+        throw new RuntimeException('Execute failed: ' . $connection->lastErrorMsg());
     }
 }

@@ -3,106 +3,110 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
-require_once __DIR__ . '/notify.php';
+require_once __DIR__ . '/audit.php';
 
 require_method('POST');
 
-$user = require_login();
+$u = require_login();
 
-if (($user['role'] ?? '') !== 'collector') {
+if (($u['role'] ?? '') !== 'collector') {
     respond([
-        'ok' => false,
         'error' => 'Forbidden',
     ], 403);
 }
 
-$input = json_input();
-$requestId = filter_var($input['request_id'] ?? null, FILTER_VALIDATE_INT);
+$body = json_input();
+$rid = (int) ($body['request_id'] ?? 0);
 
-if ($requestId === false || $requestId <= 0) {
+if ($rid <= 0) {
     respond([
-        'ok' => false,
-        'error' => 'A valid request_id is required',
+        'error' => 'Invalid request_id',
     ], 422);
 }
 
-try {
-    $database = db();
+$db = db();
+$stmt = $db->prepare('SELECT 1 FROM assignments WHERE request_id = :rid AND collector_id = :cid');
 
-    $assignmentCheck = $database->prepare(
-        'SELECT 1
-         FROM assignments
-         WHERE request_id = :rid AND collector_id = :cid
-         LIMIT 1'
-    );
-    $assignmentCheck->bindValue(':rid', $requestId, SQLITE3_INTEGER);
-    $assignmentCheck->bindValue(':cid', (int) $user['id'], SQLITE3_INTEGER);
-    $assignmentResult = $assignmentCheck->execute();
-    $assignmentRow = $assignmentResult !== false ? $assignmentResult->fetchArray(SQLITE3_ASSOC) : false;
-
-    if (!is_array($assignmentRow)) {
-        respond([
-            'ok' => false,
-            'error' => 'Not your assignment',
-        ], 403);
-    }
-
-    $ownerStatement = $database->prepare(
-        'SELECT user_id FROM pickup_requests WHERE id = :rid LIMIT 1'
-    );
-    $ownerStatement->bindValue(':rid', $requestId, SQLITE3_INTEGER);
-    $ownerResult = $ownerStatement->execute();
-    $ownerRow = $ownerResult !== false ? $ownerResult->fetchArray(SQLITE3_ASSOC) : false;
-
-    if (!is_array($ownerRow)) {
-        respond([
-            'ok' => false,
-            'error' => 'Request not found',
-        ], 404);
-    }
-
-    $database->exec('BEGIN');
-
-    $updateStatement = $database->prepare(
-        "UPDATE pickup_requests
-         SET status = 'collected'
-         WHERE id = :rid AND status = 'assigned'"
-    );
-    $updateStatement->bindValue(':rid', $requestId, SQLITE3_INTEGER);
-    $updateResult = $updateStatement->execute();
-
-    if ($updateResult === false) {
-        throw new RuntimeException('Failed to update request');
-    }
-
-    if ($database->changes() < 1) {
-        $database->exec('ROLLBACK');
-        respond([
-            'ok' => false,
-            'error' => 'Only assigned requests can be marked as collected',
-        ], 409);
-    }
-
-    add_status_history($requestId, 'collected', 'Marked collected by collector', $database);
-    add_notification(
-        (int) $ownerRow['user_id'],
-        'Pickup Collected',
-        "Your pickup request #{$requestId} has been marked as collected.",
-        $database
-    );
-    $database->exec('COMMIT');
-
+if (!$stmt) {
     respond([
-        'ok' => true,
-        'message' => 'Marked as collected',
-    ]);
-} catch (Throwable $exception) {
-    if (isset($database) && $database instanceof SQLite3) {
-        @$database->exec('ROLLBACK');
-    }
-
-    respond([
-        'ok' => false,
-        'error' => 'Failed to mark request as collected',
+        'error' => 'Prepare failed: ' . $db->lastErrorMsg(),
     ], 500);
 }
+
+$stmt->bindValue(':rid', $rid, SQLITE3_INTEGER);
+$stmt->bindValue(':cid', (int) $u['id'], SQLITE3_INTEGER);
+$res = $stmt->execute();
+
+if (!$res) {
+    respond([
+        'error' => 'Execute failed: ' . $db->lastErrorMsg(),
+    ], 500);
+}
+
+if (!is_array($res->fetchArray(SQLITE3_ASSOC))) {
+    respond([
+        'error' => 'Not assigned to you',
+    ], 403);
+}
+
+$statusStmt = $db->prepare('SELECT status, user_id FROM pickup_requests WHERE id = :rid');
+
+if (!$statusStmt) {
+    respond([
+        'error' => 'Prepare failed: ' . $db->lastErrorMsg(),
+    ], 500);
+}
+
+$statusStmt->bindValue(':rid', $rid, SQLITE3_INTEGER);
+$statusRes = $statusStmt->execute();
+
+if (!$statusRes) {
+    respond([
+        'error' => 'Execute failed: ' . $db->lastErrorMsg(),
+    ], 500);
+}
+
+$request = $statusRes->fetchArray(SQLITE3_ASSOC);
+
+if (!is_array($request)) {
+    respond([
+        'error' => 'Request not found',
+    ], 404);
+}
+
+if (($request['status'] ?? '') !== 'assigned') {
+    respond([
+        'error' => 'Request not in assigned state',
+    ], 409);
+}
+
+$stmtU = $db->prepare("UPDATE pickup_requests SET status = 'collected' WHERE id = :rid");
+
+if (!$stmtU) {
+    respond([
+        'error' => 'Prepare failed: ' . $db->lastErrorMsg(),
+    ], 500);
+}
+
+$stmtU->bindValue(':rid', $rid, SQLITE3_INTEGER);
+$resU = $stmtU->execute();
+
+if (!$resU) {
+    respond([
+        'error' => 'Execute failed: ' . $db->lastErrorMsg(),
+    ], 500);
+}
+
+if ($db->changes() === 0) {
+    respond([
+        'error' => 'Request not found',
+    ], 404);
+}
+
+add_status_history($rid, 'collected', 'Marked collected by collector', $db);
+add_notification((int) $request['user_id'], 'Pickup Collected', "Your pickup request #{$rid} has been marked as collected.", $db);
+
+respond([
+    'ok' => true,
+    'message' => 'Marked as collected',
+]);

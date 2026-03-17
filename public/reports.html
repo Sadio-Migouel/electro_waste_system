@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports | E-Waste System</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./assets/css/app.css">
+</head>
+<body>
+    <div id="app"></div>
+
+    <script src="./assets/js/api.js"></script>
+    <script src="./assets/js/layout.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function statCard(iconClass, iconStyle, label, value, note = "") {
+            return `
+                <div class="col-12 col-md-6 col-lg-3">
+                    <section class="stat-card h-100">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div>
+                                <div class="stat-label">${escapeHtml(label)}</div>
+                                <div class="stat-value">${escapeHtml(value)}</div>
+                            </div>
+                            <span class="stat-icon ${iconStyle}">
+                                <i class="bi ${iconClass}"></i>
+                            </span>
+                        </div>
+                        <div class="text-secondary small">${escapeHtml(note)}</div>
+                    </section>
+                </div>
+            `;
+        }
+
+        function formatStatusLabel(status) {
+            return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown";
+        }
+
+        function exportUrl() {
+            const params = new URLSearchParams();
+            const status = document.getElementById("exportStatus").value;
+            const from = document.getElementById("exportFrom").value;
+            const to = document.getElementById("exportTo").value;
+
+            if (status) {
+                params.set("status", status);
+            }
+            if (from) {
+                params.set("from", from);
+            }
+            if (to) {
+                params.set("to", to);
+            }
+
+            const query = params.toString();
+            return `../Api/admin_export_requests.php${query ? `?${query}` : ""}`;
+        }
+
+        async function loadReportsPage() {
+            const user = await initLayout("reports", "Reports");
+
+            if (!user) {
+                return;
+            }
+
+            if (user.role !== "admin") {
+                window.location.href = "./dashboard.html";
+                return;
+            }
+
+            const pageOutlet = document.getElementById("pageOutlet");
+            pageOutlet.innerHTML = `
+                <section class="surface-card page-heading">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+                        <div>
+                            <div class="page-chip"><i class="bi bi-graph-up-arrow"></i> Admin analytics</div>
+                            <h2 class="mt-3">Operations reports</h2>
+                            <p>Review request volume, status distribution, item demand, and export operational data.</p>
+                        </div>
+                        <div class="align-self-start align-self-lg-center">
+                            <button type="button" id="refreshReportsButton" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise me-2"></i>
+                                Refresh Reports
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <div id="reportsAlert"></div>
+                <div id="reportsStats" class="row g-4 mb-4"></div>
+                <div class="row g-4">
+                    <div class="col-12 col-xl-5">
+                        <section class="surface-card h-100">
+                            <h3 class="h5 mb-3">Status Breakdown</h3>
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="statusBreakdownBody"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                    <div class="col-12 col-xl-7">
+                        <section class="surface-card h-100">
+                            <h3 class="h5 mb-3">Requests Per Day</h3>
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Day</th>
+                                            <th>Requests</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requestsPerDayBody"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                    <div class="col-12 col-xl-5">
+                        <section class="surface-card h-100">
+                            <h3 class="h5 mb-3">Top Items</h3>
+                            <div id="topItemsHost" class="d-flex flex-wrap gap-2"></div>
+                        </section>
+                    </div>
+                    <div class="col-12 col-xl-7">
+                        <section class="surface-card h-100">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                <div>
+                                    <h3 class="h5 mb-1">Export Requests</h3>
+                                    <p class="text-secondary mb-0">Download a CSV snapshot for reporting or spreadsheet analysis.</p>
+                                </div>
+                            </div>
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-4">
+                                    <label for="exportStatus" class="form-label">Status</label>
+                                    <select id="exportStatus" class="form-select soft-select">
+                                        <option value="">All statuses</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="approved">Approved</option>
+                                        <option value="assigned">Assigned</option>
+                                        <option value="collected">Collected</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="exportFrom" class="form-label">From</label>
+                                    <input id="exportFrom" type="date" class="form-control soft-input">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="exportTo" class="form-label">To</label>
+                                    <input id="exportTo" type="date" class="form-control soft-input">
+                                </div>
+                                <div class="col-md-2 d-grid">
+                                    <a id="downloadCsvButton" class="btn btn-success" href="../Api/admin_export_requests.php">
+                                        <i class="bi bi-download me-2"></i>
+                                        Download CSV
+                                    </a>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            `;
+
+            const alertHost = document.getElementById("reportsAlert");
+            const statsHost = document.getElementById("reportsStats");
+            const statusBreakdownBody = document.getElementById("statusBreakdownBody");
+            const requestsPerDayBody = document.getElementById("requestsPerDayBody");
+            const topItemsHost = document.getElementById("topItemsHost");
+            const refreshReportsButton = document.getElementById("refreshReportsButton");
+            const downloadCsvButton = document.getElementById("downloadCsvButton");
+
+            function syncExportLink() {
+                downloadCsvButton.href = exportUrl();
+            }
+
+            ["exportStatus", "exportFrom", "exportTo"].forEach((id) => {
+                document.getElementById(id).addEventListener("change", syncExportLink);
+            });
+
+            async function renderReports() {
+                refreshReportsButton.disabled = true;
+                refreshReportsButton.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i>Refreshing...';
+                alertHost.innerHTML = "";
+
+                try {
+                    const result = await api("admin_reports.php");
+                    const totals = result.totals || {};
+                    const statusCounts = result.status_counts || {};
+                    const requestsPerDay = Array.isArray(result.requests_per_day) ? result.requests_per_day : [];
+                    const topItems = Array.isArray(result.top_items) ? result.top_items : [];
+
+                    statsHost.innerHTML = [
+                        statCard("bi-archive", "bg-primary-subtle text-primary", "Total Requests", String(totals.total_requests || 0), "All pickup requests"),
+                        statCard("bi-hourglass-split", "bg-secondary-subtle text-secondary", "Pending", String(statusCounts.pending || 0), "Awaiting action"),
+                        statCard("bi-check2-circle", "bg-success-subtle text-success", "Collected", String(statusCounts.collected || 0), "Completed pickups"),
+                        statCard("bi-people", "bg-info-subtle text-info", "Collectors", String(totals.total_collectors || 0), "Active collector accounts")
+                    ].join("");
+
+                    const statusRows = Object.keys(statusCounts).length === 0
+                        ? '<tr><td colspan="2" class="text-secondary">No status data yet.</td></tr>'
+                        : Object.entries(statusCounts).map(([status, count]) => `
+                            <tr>
+                                <td>${statusBadge(status)} <span class="ms-2">${escapeHtml(formatStatusLabel(status))}</span></td>
+                                <td>${escapeHtml(String(count))}</td>
+                            </tr>
+                        `).join("");
+                    statusBreakdownBody.innerHTML = statusRows;
+
+                    requestsPerDayBody.innerHTML = requestsPerDay.length === 0
+                        ? '<tr><td colspan="2" class="text-secondary">No request activity in the last 14 days.</td></tr>'
+                        : requestsPerDay.map((entry) => `
+                            <tr>
+                                <td>${escapeHtml(entry.day)}</td>
+                                <td>${escapeHtml(String(entry.count))}</td>
+                            </tr>
+                        `).join("");
+
+                    topItemsHost.innerHTML = topItems.length === 0
+                        ? '<div class="text-secondary">No item trends available yet.</div>'
+                        : topItems.map((item) => `
+                            <span class="badge rounded-pill text-bg-light border px-3 py-2">
+                                ${escapeHtml(item.name)} <span class="ms-2 text-secondary">${escapeHtml(String(item.count))}</span>
+                            </span>
+                        `).join("");
+
+                    syncExportLink();
+                } catch (error) {
+                    alertHost.innerHTML = `
+                        <div class="alert alert-danger mb-4" role="alert">
+                            ${escapeHtml(error.message || "Failed to load reports")}
+                        </div>
+                    `;
+                    statsHost.innerHTML = "";
+                    statusBreakdownBody.innerHTML = '<tr><td colspan="2" class="text-secondary">Unable to load data.</td></tr>';
+                    requestsPerDayBody.innerHTML = '<tr><td colspan="2" class="text-secondary">Unable to load data.</td></tr>';
+                    topItemsHost.innerHTML = '<div class="text-secondary">Unable to load data.</div>';
+                } finally {
+                    refreshReportsButton.disabled = false;
+                    refreshReportsButton.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Refresh Reports';
+                }
+            }
+
+            refreshReportsButton.addEventListener("click", renderReports);
+            await renderReports();
+        }
+
+        loadReportsPage().catch((err) => {
+            console.error(err);
+            const outlet = document.getElementById("pageOutlet") || document.getElementById("app");
+            if (outlet) {
+                outlet.innerHTML = `<div class="alert alert-danger" role="alert">${escapeHtml(err.message || "Failed to load reports")}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
+
+

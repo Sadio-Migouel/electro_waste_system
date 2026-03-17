@@ -15,14 +15,7 @@ function json_input(): array
 
     $data = json_decode($rawInput, true);
 
-    if (!is_array($data)) {
-        respond([
-            'ok' => false,
-            'error' => 'Invalid JSON body',
-        ], 400);
-    }
-
-    return $data;
+    return is_array($data) ? $data : [];
 }
 
 function respond(array $data, int $code = 200): void
@@ -57,4 +50,3 @@ function require_login(): array
 
     return $user;
 }
-

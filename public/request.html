@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Pickup | E-Waste System</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./assets/css/app.css">
+</head>
+<body>
+    <div id="app"></div>
+
+    <script src="./assets/js/api.js"></script>
+    <script src="./assets/js/layout.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function createItemRow(item = { name: "", qty: 1 }) {
+            const row = document.createElement("div");
+            row.className = "item-row";
+            row.innerHTML = `
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-7">
+                        <label class="form-label">Item name</label>
+                        <input type="text" class="form-control soft-input item-name" placeholder="Laptop, charger, battery..." value="${escapeHtml(item.name)}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Qty</label>
+                        <input type="number" class="form-control soft-input item-qty" min="1" step="1" value="${escapeHtml(item.qty)}">
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-outline-danger js-remove-item">Remove</button>
+                    </div>
+                </div>
+            `;
+
+            row.querySelector(".js-remove-item").addEventListener("click", () => {
+                row.remove();
+
+                if (document.querySelectorAll(".item-row").length === 0) {
+                    document.getElementById("itemsContainer").appendChild(createItemRow());
+                }
+            });
+
+            return row;
+        }
+
+        function collectItems() {
+            return Array.from(document.querySelectorAll(".item-row")).map((row) => ({
+                name: row.querySelector(".item-name").value.trim(),
+                qty: Number.parseInt(row.querySelector(".item-qty").value, 10)
+            }));
+        }
+
+        async function loadRequestPage() {
+            const user = await initLayout("request", "Request Pickup");
+
+            if (!user) {
+                return;
+            }
+
+            const pageOutlet = document.getElementById("pageOutlet");
+            const canCreate = user.role === "user";
+
+            pageOutlet.innerHTML = `
+                <section class="surface-card page-heading">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+                        <div>
+                            <div class="page-chip"><i class="bi bi-plus-square"></i> Pickup request</div>
+                            <h2 class="mt-3">Schedule a new collection</h2>
+                            <p>Enter your address and list the items you want collected. We will keep the request in your tracking history.</p>
+                        </div>
+                        <div class="align-self-start align-self-lg-center">
+                            <a href="./track.html" class="btn btn-outline-secondary">
+                                <i class="bi bi-list-check me-2"></i>
+                                View Request History
+                            </a>
+                        </div>
+                    </div>
+                </section>
+
+                ${canCreate ? "" : `
+                    <div class="alert alert-info mb-4" role="alert">
+                        Pickup creation is available for resident user accounts. Your current role is ${escapeHtml(user.role)}.
+                    </div>
+                `}
+
+                <section class="surface-card">
+                    <div id="requestAlert" class="mb-3"></div>
+                    <form id="requestForm">
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Pickup address</label>
+                            <textarea id="address" class="form-control soft-textarea" rows="4" placeholder="Street, building, access notes..." ${canCreate ? "" : "disabled"} required></textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h3 class="h5 mb-1">Items</h3>
+                                <p class="text-secondary mb-0">Add each e-waste item with its quantity.</p>
+                            </div>
+                            <button type="button" id="addItemButton" class="btn btn-outline-success" ${canCreate ? "" : "disabled"}>
+                                <i class="bi bi-plus-lg me-2"></i>
+                                Add Item
+                            </button>
+                        </div>
+
+                        <div id="itemsContainer" class="d-grid gap-3 mb-4"></div>
+
+                        <button type="submit" class="btn btn-success px-4" ${canCreate ? "" : "disabled"}>
+                            <i class="bi bi-send-check me-2"></i>
+                            Submit Request
+                        </button>
+                    </form>
+                </section>
+            `;
+
+            const itemsContainer = document.getElementById("itemsContainer");
+            const requestForm = document.getElementById("requestForm");
+            const alertHost = document.getElementById("requestAlert");
+            const addItemButton = document.getElementById("addItemButton");
+
+            itemsContainer.appendChild(createItemRow());
+
+            addItemButton.addEventListener("click", () => {
+                itemsContainer.appendChild(createItemRow());
+            });
+
+            requestForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+
+                if (!canCreate) {
+                    return;
+                }
+
+                const submitButton = requestForm.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Submitting...';
+                alertHost.innerHTML = "";
+
+                try {
+                    await api("requests_create.php", "POST", {
+                        address: document.getElementById("address").value.trim(),
+                        items: collectItems()
+                    });
+
+                    alertHost.innerHTML = `
+                        <div class="alert alert-success mb-0" role="alert">
+                            Request created successfully. Redirecting to tracking...
+                        </div>
+                    `;
+                    requestForm.reset();
+                    itemsContainer.innerHTML = "";
+                    itemsContainer.appendChild(createItemRow());
+                    window.setTimeout(() => {
+                        window.location.href = "./track.html";
+                    }, 700);
+                } catch (err) {
+                    console.error("Failed to create request", err);
+                    alertHost.innerHTML = `
+                        <div class="alert alert-danger mb-0" role="alert">
+                            ${escapeHtml(`Failed to create request: ${err.message}`)}
+                        </div>
+                    `;
+                } finally {
+                    submitButton.disabled = !canCreate;
+                    submitButton.innerHTML = '<i class="bi bi-send-check me-2"></i>Submit Request';
+                }
+            });
+        }
+
+        
+        loadRequestPage().catch((err) => {
+            console.error(err);
+            const outlet = document.getElementById("pageOutlet") || document.getElementById("app");
+            if (outlet) {
+                outlet.innerHTML = `<div class="alert alert-danger" role="alert">${escapeHtml(err.message || "Failed to load request page")}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+

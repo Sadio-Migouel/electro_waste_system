@@ -16,16 +16,27 @@ async function api(path, method = "GET", body) {
     const response = await fetch(`${API_BASE}/${path}`, options);
     const rawText = await response.text();
 
-    let data;
+    let data = {};
 
-    try {
-        data = rawText ? JSON.parse(rawText) : {};
-    } catch (error) {
-        throw new Error("Invalid JSON response");
+    if (rawText) {
+        try {
+            data = JSON.parse(rawText);
+        } catch (err) {
+            console.error("Invalid JSON response", {
+                path,
+                status: response.status,
+                rawText
+            });
+            throw new Error(rawText ? `Invalid JSON response: ${rawText}` : "Invalid JSON response");
+        }
     }
 
     if (!response.ok) {
-        const requestError = new Error(data.error || "Request failed");
+        const requestError = new Error(
+            typeof data.error === "string" && data.error.trim() !== ""
+                ? data.error
+                : `Request failed with status ${response.status}`
+        );
         requestError.status = response.status;
         requestError.data = data;
         throw requestError;
@@ -33,4 +44,3 @@ async function api(path, method = "GET", body) {
 
     return data;
 }
-

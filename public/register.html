@@ -3,43 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register | E-Waste Management</title>
+    <title>Register | E-Waste System</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./assets/css/app.css">
 </head>
 <body>
-    <main class="auth-shell">
-        <section class="auth-card">
-            <span class="eyebrow">Register</span>
-            <h1>Create your account</h1>
-            <p class="text-secondary mb-4">Start with a user account. Collector and admin roles can be managed later from the backend.</p>
+    <main class="auth-page">
+        <section class="auth-layout">
+            <div class="auth-hero">
+                <span class="auth-brand-mark"><i class="bi bi-recycle"></i></span>
+                <h1>Create your E-Waste account</h1>
+                <p>Register as a resident user and start submitting pickup requests through the redesigned portal.</p>
 
-            <div id="alertBox" class="alert d-none" role="alert"></div>
+                <div class="auth-bullets">
+                    <div class="auth-bullet">
+                        <strong>Fast onboarding</strong>
+                        <div class="small mt-1">Your account starts as a standard user. Collector and admin roles are managed later by the backend.</div>
+                    </div>
+                    <div class="auth-bullet">
+                        <strong>Consistent experience</strong>
+                        <div class="small mt-1">The same design system carries across dashboard, request tracking, and profile pages.</div>
+                    </div>
+                </div>
+            </div>
 
-            <form id="registerForm" class="row g-3">
-                <div class="col-12">
-                    <label for="full_name" class="form-label">Full name</label>
-                    <input type="text" class="form-control" id="full_name" name="full_name" required>
-                </div>
-                <div class="col-12">
-                    <label for="email" class="form-label">Email</label>
-                    <input type="email" class="form-control" id="email" name="email" required>
-                </div>
-                <div class="col-12">
-                    <label for="phone" class="form-label">Phone</label>
-                    <input type="text" class="form-control" id="phone" name="phone">
-                </div>
-                <div class="col-12">
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="password" name="password" minlength="6" required>
-                </div>
-                <div class="col-12 d-grid">
-                    <button type="submit" class="btn btn-success">Register</button>
-                </div>
-            </form>
+            <div class="auth-panel">
+                <div class="page-chip mb-3"><i class="bi bi-person-plus"></i> New account</div>
+                <h2>Register</h2>
+                <p>Fill in your details to create a session-enabled account.</p>
 
-            <p class="mt-4 mb-0">Already registered? <a href="./login.html">Login here</a>.</p>
+                <div id="alertBox" class="mb-3"></div>
+
+                <form id="registerForm" class="row g-3">
+                    <div class="col-12">
+                        <label for="full_name" class="form-label">Full name</label>
+                        <input type="text" class="form-control soft-input" id="full_name" name="full_name" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="email" class="form-label">Email address</label>
+                        <input type="email" class="form-control soft-input" id="email" name="email" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="phone" class="form-label">Phone</label>
+                        <input type="text" class="form-control soft-input" id="phone" name="phone">
+                    </div>
+                    <div class="col-12">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control soft-input" id="password" name="password" minlength="6" required>
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">Create Account</button>
+                    </div>
+                </form>
+
+                <p class="mt-4 mb-0 text-secondary">Already registered? <a href="./login.html">Go to login</a>.</p>
+            </div>
         </section>
     </main>
 
@@ -48,9 +68,22 @@
         const registerForm = document.getElementById("registerForm");
         const alertBox = document.getElementById("alertBox");
 
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "\"": "&quot;",
+                "'": "&#39;"
+            }[char]));
+        }
+
         function showAlert(message, type) {
-            alertBox.className = `alert alert-${type}`;
-            alertBox.textContent = message;
+            alertBox.innerHTML = `
+                <div class="alert alert-${type} mb-0" role="alert">
+                    ${escapeHtml(message)}
+                </div>
+            `;
         }
 
         registerForm.addEventListener("submit", async (event) => {
@@ -58,19 +91,24 @@
 
             const formData = new FormData(registerForm);
             const payload = Object.fromEntries(formData.entries());
+            const submitButton = registerForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = "Creating account...";
 
             try {
                 const result = await api("auth_register.php", "POST", payload);
-                showAlert(result.message || "Registered", "success");
+                showAlert(result.message || "Registered successfully", "success");
                 registerForm.reset();
                 window.setTimeout(() => {
                     window.location.href = "./login.html";
                 }, 1200);
             } catch (error) {
-                showAlert(error.message, "danger");
+                showAlert(error.message || "Registration failed", "danger");
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = "Create Account";
             }
         });
     </script>
 </body>
 </html>
-

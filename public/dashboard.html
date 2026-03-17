@@ -3,58 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | E-Waste Management</title>
+    <title>Dashboard | E-Waste System</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./assets/css/app.css">
 </head>
 <body>
-    <main class="dashboard-shell">
-        <section class="dashboard-card">
-            <span class="eyebrow">Role Router</span>
-            <h1>Routing to your dashboard</h1>
-            <p class="text-secondary mb-0">Your session is being checked. If you stay here, there may be a network or auth issue.</p>
-            <div class="meta-list mt-4">
-                <div class="meta-item">
-                    <strong>Status</strong>
-                    <span id="routingMessage">Routing...</span>
-                </div>
-            </div>
-        </section>
-    </main>
+    <div id="app"></div>
 
     <script src="./assets/js/api.js"></script>
-    <script src="./assets/js/guard.js"></script>
+    <script src="./assets/js/layout.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const routingMessage = document.getElementById("routingMessage");
-
-        function redirectByRole(role) {
-            const routes = {
-                user: "./user.html",
-                collector: "./collector.html",
-                admin: "./admin.html"
-            };
-
-            const target = routes[role] || "./login.html";
-            window.location.href = target;
+        function statCard(iconClass, iconStyle, label, value, note = "") {
+            return `
+                <div class="col-12 col-md-6 col-lg-3">
+                    <section class="stat-card h-100">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div>
+                                <div class="stat-label">${escapeHtml(label)}</div>
+                                <div class="stat-value">${escapeHtml(value)}</div>
+                            </div>
+                            <span class="stat-icon ${iconStyle}">
+                                <i class="bi ${iconClass}"></i>
+                            </span>
+                        </div>
+                        <div class="text-secondary small">${escapeHtml(note)}</div>
+                    </section>
+                </div>
+            `;
         }
 
-        async function routeDashboard() {
+        function recentRequestsTable(requests) {
+            if (!Array.isArray(requests) || requests.length === 0) {
+                return `
+                    <div class="surface-card empty-state">
+                        <i class="bi bi-inbox fs-2 d-block mb-3"></i>
+                        <div class="fw-semibold mb-2">No requests yet</div>
+                        <div>Create a pickup request to start tracking e-waste collection.</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <section class="surface-card table-shell">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h3 class="h5 mb-1">Recent Requests</h3>
+                            <p class="text-secondary mb-0">Latest activity from your pickup workflow.</p>
+                        </div>
+                        <a href="./track.html" class="btn btn-outline-secondary btn-sm">View all</a>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Status</th>
+                                    <th>Address</th>
+                                    <th>Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${requests.map((request) => `
+                                    <tr>
+                                        <td>#${request.id}</td>
+                                        <td>${statusBadge(request.status)}</td>
+                                        <td>${escapeHtml(request.address)}</td>
+                                        <td>${escapeHtml(request.created_at)}</td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            `;
+        }
+
+        function dashboardIntro(user) {
+            const roleNotes = {
+                user: "Submit new pickup requests and monitor their status in one place.",
+                collector: "Review your assigned pickups and stay aligned with current collection activity.",
+                admin: "Track request volume, monitor progress, and manage the collection network."
+            };
+
+            return `
+                <section class="surface-card page-heading">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+                        <div>
+                            <div class="page-chip"><i class="bi bi-stars"></i> Operations snapshot</div>
+                            <h2 class="mt-3">Welcome back, ${escapeHtml(user.full_name)}</h2>
+                            <p>${escapeHtml(roleNotes[user.role] || "Overview of the current E-Waste system activity.")}</p>
+                        </div>
+                        <div class="align-self-start align-self-lg-center">
+                            <a href="./request.html" class="btn btn-success">
+                                <i class="bi bi-plus-circle me-2"></i>
+                                New Pickup Request
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            `;
+        }
+
+        async function loadDashboard() {
+            const user = await initLayout("dashboard", "Dashboard");
+
+            if (!user) {
+                return;
+            }
+
+            const pageOutlet = document.getElementById("pageOutlet");
+            pageOutlet.innerHTML = `
+                ${dashboardIntro(user)}
+                <div id="dashboardAlert"></div>
+                <div id="dashboardStats" class="row g-4 mb-4"></div>
+                <div id="dashboardRecent"></div>
+            `;
+
+            const alertHost = document.getElementById("dashboardAlert");
+            const statsHost = document.getElementById("dashboardStats");
+            const recentHost = document.getElementById("dashboardRecent");
+
             try {
-                const user = await getCurrentUser();
-                routingMessage.textContent = `Authenticated as ${user.role}. Redirecting...`;
-                redirectByRole(user.role);
-            } catch (error) {
-                if (error.status === 401) {
-                    window.location.href = "./login.html";
-                    return;
+                const result = await api("requests_list.php");
+                const requests = Array.isArray(result.requests) ? result.requests : [];
+                const total = requests.length;
+                const pending = requests.filter((request) => request.status === "pending").length;
+                const collected = requests.filter((request) => request.status === "collected").length;
+                let collectorsValue = "N/A";
+                let collectorNote = "Visible for admin accounts";
+
+                if (user.role === "admin") {
+                    const usersResult = await api("admin_users_list.php");
+                    const users = Array.isArray(usersResult.users) ? usersResult.users : [];
+                    collectorsValue = String(users.filter((item) => item.role === "collector").length);
+                    collectorNote = "Registered collectors";
                 }
 
-                routingMessage.textContent = error.message || "Unable to route right now.";
+                statsHost.innerHTML = [
+                    statCard("bi-archive", "bg-primary-subtle text-primary", "Total Requests", String(total), "All visible requests"),
+                    statCard("bi-hourglass-split", "bg-secondary-subtle text-secondary", "Pending", String(pending), "Awaiting approval or assignment"),
+                    statCard("bi-check2-circle", "bg-success-subtle text-success", "Collected", String(collected), "Completed pickups"),
+                    statCard("bi-people", "bg-info-subtle text-info", "Collectors", collectorsValue, collectorNote)
+                ].join("");
+
+                recentHost.innerHTML = recentRequestsTable(requests.slice(0, 8));
+            } catch (error) {
+                alertHost.innerHTML = `
+                    <div class="alert alert-danger mb-4" role="alert">
+                        ${escapeHtml(error.message || "Failed to load dashboard data")}
+                    </div>
+                `;
+                recentHost.innerHTML = recentRequestsTable([]);
             }
         }
 
-        routeDashboard();
+        loadDashboard().catch((err) => {
+            console.error(err);
+            const outlet = document.getElementById("pageOutlet") || document.getElementById("app");
+            if (outlet) {
+                outlet.innerHTML = `<div class="alert alert-danger" role="alert">${escapeHtml(err.message || "Failed to load dashboard")}</div>`;
+            }
+        });
     </script>
 </body>
 </html>
+
+
+
+
+
+

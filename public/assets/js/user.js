@@ -316,8 +316,9 @@ async function submitRequest(event) {
         addItemRow();
         await loadRequests();
         await loadNotifications();
-    } catch (error) {
-        showFeedback(error.message || "Failed to create request", "danger");
+    } catch (err) {
+        console.error("Failed to create request", err);
+        showFeedback(`Failed to create request: ${err.message}`, "danger");
     } finally {
         submitButton.disabled = false;
         submitButton.textContent = "Submit Request";
@@ -362,3 +363,4 @@ requestsTableBody.addEventListener("click", (event) => {
 loadPage().catch((error) => {
     showFeedback(error.message || "Failed to load page", "danger");
 });
+
