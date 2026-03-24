@@ -16,6 +16,8 @@
     <script src="./assets/js/layout.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        const MAX_MEDIA_SIZE = 20 * 1024 * 1024;
+
         function createItemRow(item = { name: "", qty: 1 }) {
             const row = document.createElement("div");
             row.className = "item-row";
@@ -53,6 +55,48 @@
             }));
         }
 
+        function renderMediaPreview(file) {
+            const previewHost = document.getElementById("mediaPreview");
+
+            if (!previewHost) {
+                return;
+            }
+
+            if (!file) {
+                previewHost.innerHTML = "";
+                previewHost.classList.add("d-none");
+                return;
+            }
+
+            previewHost.classList.remove("d-none");
+
+            if (file.type.startsWith("image/")) {
+                const previewUrl = URL.createObjectURL(file);
+                previewHost.innerHTML = `
+                    <div class="media-preview-shell mt-3">
+                        <img src="${previewUrl}" alt="Selected e-waste preview" class="media-preview-image">
+                        <div class="media-preview-meta">
+                            <strong>${escapeHtml(file.name)}</strong>
+                            <span>${escapeHtml((file.size / (1024 * 1024)).toFixed(2))} MB</span>
+                        </div>
+                    </div>
+                `;
+
+                const previewImage = previewHost.querySelector("img");
+                previewImage.addEventListener("load", () => URL.revokeObjectURL(previewUrl), { once: true });
+                return;
+            }
+
+            previewHost.innerHTML = `
+                <div class="media-preview-shell mt-3">
+                    <div class="media-preview-meta w-100">
+                        <strong>${escapeHtml(file.name)}</strong>
+                        <span>${escapeHtml(file.type || "Video file")} · ${escapeHtml((file.size / (1024 * 1024)).toFixed(2))} MB</span>
+                    </div>
+                </div>
+            `;
+        }
+
         async function loadRequestPage() {
             const user = await initLayout("request", "Request Pickup");
 
@@ -69,7 +113,7 @@
                         <div>
                             <div class="page-chip"><i class="bi bi-plus-square"></i> Pickup request</div>
                             <h2 class="mt-3">Schedule a new collection</h2>
-                            <p>Enter your address and list the items you want collected. We will keep the request in your tracking history.</p>
+                            <p>Enter your address, list the items you want collected, and upload a photo or video of the e-waste items before submitting.</p>
                         </div>
                         <div class="align-self-start align-self-lg-center">
                             <a href="./track.html" class="btn btn-outline-secondary">
@@ -107,6 +151,13 @@
 
                         <div id="itemsContainer" class="d-grid gap-3 mb-4"></div>
 
+                        <div class="mb-4">
+                            <label for="media" class="form-label">Upload Photo/Video of E-Waste (required)</label>
+                            <input type="file" id="media" name="media" class="form-control" accept="image/*,video/*" ${canCreate ? "" : "disabled"} required>
+                            <div class="form-text upload-help-text">Allowed: JPG, PNG, WEBP, MP4, WEBM, MOV. Max size: 20MB.</div>
+                            <div id="mediaPreview" class="d-none"></div>
+                        </div>
+
                         <button type="submit" class="btn btn-success px-4" ${canCreate ? "" : "disabled"}>
                             <i class="bi bi-send-check me-2"></i>
                             Submit Request
@@ -119,11 +170,17 @@
             const requestForm = document.getElementById("requestForm");
             const alertHost = document.getElementById("requestAlert");
             const addItemButton = document.getElementById("addItemButton");
+            const mediaInput = document.getElementById("media");
 
             itemsContainer.appendChild(createItemRow());
 
             addItemButton.addEventListener("click", () => {
                 itemsContainer.appendChild(createItemRow());
+            });
+
+            mediaInput.addEventListener("change", () => {
+                const file = mediaInput.files && mediaInput.files[0] ? mediaInput.files[0] : null;
+                renderMediaPreview(file);
             });
 
             requestForm.addEventListener("submit", async (event) => {
@@ -134,24 +191,58 @@
                 }
 
                 const submitButton = requestForm.querySelector('button[type="submit"]');
+                const mediaFile = mediaInput.files && mediaInput.files[0] ? mediaInput.files[0] : null;
+
+                if (!mediaFile) {
+                    alertHost.innerHTML = '<div class="alert alert-danger mb-0" role="alert">Please upload a photo or video of the e-waste items.</div>';
+                    return;
+                }
+
+                if (mediaFile.size > MAX_MEDIA_SIZE) {
+                    alertHost.innerHTML = '<div class="alert alert-danger mb-0" role="alert">Selected file is too large. Maximum allowed size is 20MB.</div>';
+                    return;
+                }
+
                 submitButton.disabled = true;
                 submitButton.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Submitting...';
                 alertHost.innerHTML = "";
 
                 try {
-                    await api("requests_create.php", "POST", {
-                        address: document.getElementById("address").value.trim(),
-                        items: collectItems()
+                    const formData = new FormData();
+                    formData.append("address", document.getElementById("address").value.trim());
+                    formData.append("items", JSON.stringify(collectItems()));
+                    formData.append("media", mediaFile);
+
+                    const response = await fetch(`${API_BASE}/requests_create.php`, {
+                        method: "POST",
+                        body: formData,
+                        credentials: "include"
                     });
+
+                    const rawText = await response.text();
+                    let data = {};
+
+                    if (rawText) {
+                        try {
+                            data = JSON.parse(rawText);
+                        } catch (parseError) {
+                            throw new Error(rawText || "Invalid JSON response");
+                        }
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(typeof data.error === "string" && data.error.trim() !== "" ? data.error : `Request failed with status ${response.status}`);
+                    }
 
                     alertHost.innerHTML = `
                         <div class="alert alert-success mb-0" role="alert">
-                            Request created successfully. Redirecting to tracking...
+                            ${escapeHtml(data.message || "Request created successfully. Redirecting to tracking...")}
                         </div>
                     `;
                     requestForm.reset();
                     itemsContainer.innerHTML = "";
                     itemsContainer.appendChild(createItemRow());
+                    renderMediaPreview(null);
                     window.setTimeout(() => {
                         window.location.href = "./track.html";
                     }, 700);
@@ -169,7 +260,6 @@
             });
         }
 
-        
         loadRequestPage().catch((err) => {
             console.error(err);
             const outlet = document.getElementById("pageOutlet") || document.getElementById("app");
@@ -180,14 +270,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-

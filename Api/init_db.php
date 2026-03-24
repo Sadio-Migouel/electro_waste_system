@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS pickup_requests (
     user_id INTEGER NOT NULL,
     address TEXT NOT NULL,
     items TEXT NOT NULL,
+    media_path TEXT,
     status TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'assigned', 'collected', 'cancelled')) DEFAULT 'pending',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
